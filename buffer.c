@@ -55,9 +55,11 @@ int circular_buffer_write(CircularBuffer* cb, int item) {
 // If the read index reaches the end of the buffer, it should wrap around to the beginning. 
 // If the buffer is empty, the function should return an error.
 int circular_buffer_read(CircularBuffer* cb, int* item) {
+    // buffer empty
     if (cb->count == 0) {
-        return -1; // buffer empty
+        return -1; 
     }
+    // 
     *item = cb->buffer[cb->read_index];
     cb->read_index = (cb->read_index + 1) % cb->size;
     cb->count--;
@@ -75,16 +77,23 @@ int main(void) {
     circular_buffer_init(&cb, 5);
     circular_buffer_write(&cb, 1);
     circular_buffer_write(&cb, 2);
-    int item;
+    int item = 0;
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // item = 1
+    printf("Current item value: %d\n", item);
     circular_buffer_write(&cb, 3);
     circular_buffer_write(&cb, 4);
     circular_buffer_write(&cb, 5);
     circular_buffer_write(&cb, 6); // error: buffer full
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // item = 2
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // item = 3
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // item = 4
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // item = 5
+    printf("Current item value: %d\n", item);
     circular_buffer_read(&cb, &item); // error: buffer empty
     circular_buffer_free(&cb);
     printf("successful circlular buffer\n");
