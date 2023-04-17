@@ -36,13 +36,16 @@ void circular_buffer_init(circular_buffer *cb) {
 char circular_buffer_read(circular_buffer *cb) {
     sem_wait(&cb->empty);
     pthread_mutex_lock(&cb->mutex);
-    if (cb->head == cb->tail) {
-        pthread_mutex_unlock(&cb->mutex);
-        sem_post(&cb->empty);
-        return '\0'; // Buffer is empty
-    }
-    char c = cb->buffer[cb->head];
-    cb->head = (cb->head + 1) % BUFFER_SIZE;
+    // CRITICAL SECTION
+        // Buffer is empty
+        if (cb->head == cb->tail) {
+            pthread_mutex_unlock(&cb->mutex);
+            sem_post(&cb->empty);
+            return '\0'; 
+        }
+        char c = cb->buffer[cb->head];
+        printf("%c\n",c);
+        cb->head = (cb->head + 1) % BUFFER_SIZE;
     pthread_mutex_unlock(&cb->mutex);
     sem_post(&cb->full);
     return c;
@@ -97,13 +100,34 @@ void *read_from_buffer(void *arg) {
     return NULL;
 }
 
+// MAIN FUNCTION
 int main() {
+    // Create pthread objects
     pthread_t write_thread, read_thread;
+    
+    // Initialize circular buffer
     circular_buffer cb;
     circular_buffer_init(&cb);
-    pthread_create(&write_thread, NULL, write_to_buffer, &cb);
-    pthread_create(&read_thread, NULL, read_from_buffer, &cb);
-    pthread_join(write_thread, NULL);
-    pthread_join(read_thread, NULL);
+
+    // CREATE PRODUCER: reads from file, writes to buffer
+    // pthread_create(&write_thread, NULL, write_to_buffer, &cb);
+    // CREATE CONSUMER: reads from buffer, writes to output
+    // pthread_create(&read_thread, NULL, read_from_buffer, &cb);
+    
+    circular_buffer_write(&cb, 'a');
+    circular_buffer_write(&cb, 'm');
+    circular_buffer_write(&cb, 'o');
+    circular_buffer_write(&cb, 'g');
+    circular_buffer_write(&cb, 'u');
+    circular_buffer_write(&cb, 's');
+    
+    circular_buffer_read(&cb);
+    circular_buffer_read(&cb);
+    circular_buffer_read(&cb);
+    circular_buffer_read(&cb);
+    circular_buffer_read(&cb);
+    circular_buffer_read(&cb);
+    // pthread_join(write_thread, NULL);
+    // pthread_join(read_thread, NULL);
     return 0;
 }
