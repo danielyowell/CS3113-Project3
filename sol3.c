@@ -25,6 +25,7 @@ typedef struct {
     sem_t empty;
 } circular_buffer;
 
+// INITIALIZE CIRCULAR BUFFER
 void circular_buffer_init(circular_buffer *cb) {
     cb->head = 0;
     cb->tail = 0;
@@ -33,6 +34,7 @@ void circular_buffer_init(circular_buffer *cb) {
     sem_init(&cb->empty, 0, 0);
 }
 
+// write to output
 char circular_buffer_read(circular_buffer *cb) {
     sem_wait(&cb->empty);
     pthread_mutex_lock(&cb->mutex);
@@ -46,11 +48,13 @@ char circular_buffer_read(circular_buffer *cb) {
         char c = cb->buffer[cb->head];
         printf("%c\n",c);
         cb->head = (cb->head + 1) % BUFFER_SIZE;
+    // END CRITICAL SECTION
     pthread_mutex_unlock(&cb->mutex);
     sem_post(&cb->full);
     return c;
 }
 
+// write to buffer (do not print)
 int circular_buffer_write(circular_buffer *cb, char c) {
     sem_wait(&cb->full);
     pthread_mutex_lock(&cb->mutex);
@@ -67,34 +71,43 @@ int circular_buffer_write(circular_buffer *cb, char c) {
     return 0;
 }
 
+// READ FROM FILE, WRITE TO BUFFER
 void *write_to_buffer(void *arg) {
+    // this should be the same circular buffer as before (arg)
     circular_buffer *cb = (circular_buffer *) arg;
     FILE *fp;
     char c;
+
+    // open file
     fp = fopen("mytest.dat", "r");
     if (fp == NULL) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
+
+    // while the end of the file has not been reached
     while ((c = fgetc(fp)) != EOF) {
         if (c == '*') {
             break;
         }
+        // write the character to the buffer, unless it is 0
         if (circular_buffer_write(cb, c) != 0) {
-            fprintf(stderr, "Circular buffer is full\n");
-            break;
+            //fprintf(stderr, "Circular buffer is full\n");
+            //break;
         }
     }
     fclose(fp);
     return NULL;
 }
 
+// READ FROM BUFFER, WRITE TO OUTPUT
+// after writing to output, remove from buffer
 void *read_from_buffer(void *arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     while ((c = circular_buffer_read(cb)) != '*') {
         //putchar(c);
-        printf("%c",c);
+        //printf("%c",c);
         sleep(1);
     }
     return NULL;
@@ -110,10 +123,12 @@ int main() {
     circular_buffer_init(&cb);
 
     // CREATE PRODUCER: reads from file, writes to buffer
-    // pthread_create(&write_thread, NULL, write_to_buffer, &cb);
+    // we pass &cb as an argument to write_to_buffer. does this mean it gets used by the thread?
+    pthread_create(&write_thread, NULL, write_to_buffer, &cb);
     // CREATE CONSUMER: reads from buffer, writes to output
-    // pthread_create(&read_thread, NULL, read_from_buffer, &cb);
+    pthread_create(&read_thread, NULL, read_from_buffer, &cb);
     
+    /*
     circular_buffer_write(&cb, 'a');
     circular_buffer_write(&cb, 'm');
     circular_buffer_write(&cb, 'o');
@@ -126,8 +141,10 @@ int main() {
     circular_buffer_read(&cb);
     circular_buffer_read(&cb);
     circular_buffer_read(&cb);
-    circular_buffer_read(&cb);
-    // pthread_join(write_thread, NULL);
-    // pthread_join(read_thread, NULL);
+    circular_buffer_read(&cb);    
+    */
+
+    pthread_join(write_thread, NULL);
+    pthread_join(read_thread, NULL);
     return 0;
 }
