@@ -36,7 +36,9 @@ void circular_buffer_init(circular_buffer *cb) {
 
 // write to output
 char circular_buffer_read(circular_buffer *cb) {
+    // wait on the "empty" semaphore to ensure that there is at least one slot occupied in the buffer
     sem_wait(&cb->empty);
+    // acquire mutex
     pthread_mutex_lock(&cb->mutex);
     // CRITICAL SECTION
         // Buffer is empty
@@ -45,11 +47,15 @@ char circular_buffer_read(circular_buffer *cb) {
             sem_post(&cb->empty);
             return '\0'; 
         }
+        // Otherwise, extract character from head of buffer and print
         char c = cb->buffer[cb->head];
         printf("%c\n",c);
+        // update head index
         cb->head = (cb->head + 1) % BUFFER_SIZE;
     // END CRITICAL SECTION
+    // release mutex
     pthread_mutex_unlock(&cb->mutex);
+    // signal the "full" semaphore to indicate that there is one more slot available in the buffer
     sem_post(&cb->full);
     return c;
 }
@@ -90,12 +96,21 @@ void *write_to_buffer(void *arg) {
         if (c == '*') {
             break;
         }
-        // write the character to the buffer, unless it is 0
-        if (circular_buffer_write(cb, c) != 0) {
+        // "write" should return 0
+        // if it returns -1, the buffer is full
+        int write = circular_buffer_write(cb, c);
+        if (write != 0) {
             //fprintf(stderr, "Circular buffer is full\n");
             //break;
+            printf("buffer is full right now\n");
         }
+        else {
+            printf("buffer has space\n");
+        }
+        //printf("lol\n");
+        sleep(1);
     }
+    printf("closing write_to_buffer\n");
     fclose(fp);
     return NULL;
 }
