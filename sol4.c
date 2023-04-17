@@ -35,35 +35,29 @@ void circular_buffer_init(circular_buffer *cb) {
     sem_init(&cb->empty, 0, 0);
 }
 
-// ! READ FROM [FILE], WRITE TO [BUFFER]
-void *write_to_buffer(void *arg) {
-    printf("beginning write_to_buffer\n");
-    // this should be the same circular buffer as before (arg)
-    circular_buffer *cb = (circular_buffer *) arg;
-    FILE *fp;
-    char c;
-    printf("exiting write_to_buffer\n");
-    fclose(fp);
-    return NULL;
-}
-// ! READ FROM [BUFFER], [WRITE TO OUTPUT]
-// after writing to output, remove from buffer
-void *read_from_buffer(void *arg) {
-    printf("beginning read_from_buffer\n");
-    circular_buffer *cb = (circular_buffer *) arg;
-    char c;
-    /**/
-    printf("exiting read_from_buffer\n");
-    return NULL;
-}
-
-void* thread1_func(void* arg) {
+void* readfile_writebuffer(void* arg) {
     // Do some task in thread 1
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c;
     printf("Thread 1\n");
+
+    // open file
+    FILE *fp;
+    fp = fopen("mytest.dat", "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    // close file
+    fclose(fp);
+
     pthread_exit(NULL);
 }
-void* thread2_func(void* arg) {
+void* readbuffer_writeoutput(void* arg) {
     // Do some task in thread 2
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c;
     printf("Thread 2\n");
     pthread_exit(NULL);
 }
@@ -78,10 +72,13 @@ int main() {
     circular_buffer_init(&cb);
 
     // CREATE PRODUCER: reads from file, writes to buffer
-    pthread_create(&write_thread, NULL, thread1_func, NULL); // &cb arg
+    pthread_create(&write_thread, NULL, readfile_writebuffer, &cb);
 
+    // Sleep for 0.5 seconds
+    usleep(100000);
+    
     // CREATE CONSUMER: reads from buffer, writes to output
-    pthread_create(&read_thread, NULL, thread2_func, NULL);
+    pthread_create(&read_thread, NULL, readbuffer_writeoutput, &cb);
 
     pthread_join(write_thread, NULL);
     pthread_join(read_thread, NULL);
