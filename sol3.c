@@ -34,7 +34,8 @@ void circular_buffer_init(circular_buffer *cb) {
     sem_init(&cb->empty, 0, 0);
 }
 
-// write to output
+// extract character
+// new plan: do not print to output from this function
 char circular_buffer_read(circular_buffer *cb) {
     // wait on the "empty" semaphore to ensure that there is at least one slot occupied in the buffer
     sem_wait(&cb->empty);
@@ -49,7 +50,7 @@ char circular_buffer_read(circular_buffer *cb) {
         }
         // Otherwise, extract character from head of buffer and print
         char c = cb->buffer[cb->head];
-        printf("%c",c);
+        printf("%c",c); // no
         // update head index
         cb->head = (cb->head + 1) % BUFFER_SIZE;
     // END CRITICAL SECTION
@@ -79,6 +80,7 @@ int circular_buffer_write(circular_buffer *cb, char c) {
 
 // READ FROM FILE, WRITE TO BUFFER
 void *write_to_buffer(void *arg) {
+    printf("beginning write_to_buffer\n");
     // this should be the same circular buffer as before (arg)
     circular_buffer *cb = (circular_buffer *) arg;
     FILE *fp;
@@ -99,6 +101,7 @@ void *write_to_buffer(void *arg) {
         // "write" should return 0
         // if it returns -1, the buffer is full
         int write = circular_buffer_write(cb, c);
+        printf("write_to_buffer: wrote %c to buffer\n", c);
         if (write != 0) {
             //fprintf(stderr, "Circular buffer is full\n");
             //break;
@@ -126,7 +129,7 @@ void *read_from_buffer(void *arg) {
         if(c == EOF) {
             break;
         }
-        //printf("current c: %c\n",c); // why does this allow for printing?!?!
+        printf("%c",c); // why does this allow for printing?!?!
     }
     printf("\nexiting read_from_buffer\n");
     return NULL;
