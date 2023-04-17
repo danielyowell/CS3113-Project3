@@ -11,11 +11,11 @@
 #include <fcntl.h>
 #include <sys/sem.h>
 #include <sys/ipc.h>
-//
 #include <pthread.h>
+#include <semaphore.h>
 
+// STRUCT
 #define BUFFER_SIZE 15
-
 typedef struct {
     char buffer[BUFFER_SIZE];
     int head;
@@ -31,6 +31,21 @@ void circular_buffer_init(circular_buffer *cb) {
     pthread_mutex_init(&cb->mutex, NULL);
     sem_init(&cb->full, 0, BUFFER_SIZE);
     sem_init(&cb->empty, 0, 0);
+}
+
+char circular_buffer_read(circular_buffer *cb) {
+    sem_wait(&cb->empty);
+    pthread_mutex_lock(&cb->mutex);
+    if (cb->head == cb->tail) {
+        pthread_mutex_unlock(&cb->mutex);
+        sem_post(&cb->empty);
+        return '\0'; // Buffer is empty
+    }
+    char c = cb->buffer[cb->head];
+    cb->head = (cb->head + 1) % BUFFER_SIZE;
+    pthread_mutex_unlock(&cb->mutex);
+    sem_post(&cb->full);
+    return c;
 }
 
 int circular_buffer_write(circular_buffer *cb, char c) {
@@ -53,7 +68,7 @@ void *write_to_buffer(void *arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     FILE *fp;
     char c;
-    fp = fopen("data.dat", "r");
+    fp = fopen("mytest.dat", "r");
     if (fp == NULL) {
         perror("Error opening file");
         exit(EXIT_FAILURE);
@@ -75,7 +90,8 @@ void *read_from_buffer(void *arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     while ((c = circular_buffer_read(cb)) != '*') {
-        putchar(c);
+        //putchar(c);
+        printf("%c",c);
         sleep(1);
     }
     return NULL;
