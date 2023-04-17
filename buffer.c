@@ -19,7 +19,7 @@
 // - A write index to track the next item to write
 // - A count to track the number of items in the buffer
 typedef struct {
-    int* buffer;
+    char* buffer;
     size_t size;
     size_t read_index;
     size_t write_index;
@@ -40,7 +40,7 @@ void circular_buffer_init(CircularBuffer* cb, size_t size) {
 // This function should write the item to the buffer at the current write index and increment the write index.
 // If the write index reaches the end of the buffer, it should wrap around to the beginning. 
 // If the buffer is full, the function should return an error.
-int circular_buffer_write(CircularBuffer* cb, int item) {
+int circular_buffer_write(CircularBuffer* cb, char item) {
     if (cb->count == cb->size) {
         return -1; // buffer full
     }
@@ -54,7 +54,7 @@ int circular_buffer_write(CircularBuffer* cb, int item) {
 // This function should read the item at the current read index and increment the read index. 
 // If the read index reaches the end of the buffer, it should wrap around to the beginning. 
 // If the buffer is empty, the function should return an error.
-int circular_buffer_read(CircularBuffer* cb, int* item) {
+int circular_buffer_read(CircularBuffer* cb, char* item) {
     // buffer empty
     if (cb->count == 0) {
         return -1; 
@@ -75,25 +75,25 @@ int main(void) {
     printf("hello world\n");
     CircularBuffer cb;
     circular_buffer_init(&cb, 5);
-    circular_buffer_write(&cb, 1);
-    circular_buffer_write(&cb, 2);
-    int item = 0;
-    printf("Current item value: %d\n", item);
+    circular_buffer_write(&cb, 'a');
+    circular_buffer_write(&cb, 'b');
+    char item = 'x';
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // item = 1
-    printf("Current item value: %d\n", item);
-    circular_buffer_write(&cb, 3);
-    circular_buffer_write(&cb, 4);
-    circular_buffer_write(&cb, 5);
-    circular_buffer_write(&cb, 6); // error: buffer full
-    printf("Current item value: %d\n", item);
+    printf("Current item value: %c\n", item);
+    circular_buffer_write(&cb, 'c');
+    circular_buffer_write(&cb, 'd');
+    circular_buffer_write(&cb, 'e');
+    circular_buffer_write(&cb, 'f'); // error: buffer full
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // item = 2
-    printf("Current item value: %d\n", item);
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // item = 3
-    printf("Current item value: %d\n", item);
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // item = 4
-    printf("Current item value: %d\n", item);
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // item = 5
-    printf("Current item value: %d\n", item);
+    printf("Current item value: %c\n", item);
     circular_buffer_read(&cb, &item); // error: buffer empty
     circular_buffer_free(&cb);
     printf("successful circlular buffer\n");
