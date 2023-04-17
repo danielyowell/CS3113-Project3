@@ -1,6 +1,7 @@
 // clean slate
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -98,6 +99,7 @@ void* readfile_writebuffer(void* arg) {
     // while the end of the file has not been reached
     while ((c = fgetc(fp)) != EOF) {
         if (c == '*') {
+            printf("asterisk found\n");
             break;
         }
         // "write" should return 0
@@ -107,14 +109,14 @@ void* readfile_writebuffer(void* arg) {
             printf("buffer is full right now\n");
         }
         else {
-            //printf("wrote %c to buffer\n", c);
+            printf("wrote %c to buffer\n", c);
         }
-        sleep(1);
+        usleep(100000);
     }
 
     // close file
     fclose(fp);
-
+    printf("readfile_writebuffer: exiting\n");
     pthread_exit(NULL);
 }
 void* readbuffer_writeoutput(void* arg) {
@@ -122,14 +124,26 @@ void* readbuffer_writeoutput(void* arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     printf("Thread 2\n");
-    while ((c = circular_buffer_read(cb)) != '*') {
+    bool b = false;
+    if(b) {
+        while ((c = circular_buffer_read(cb)) != '*') {
         if(c == EOF) {
             break;
         }
         printf("%c",c);
         sleep(1);
+        }
     }
-    printf("\nexiting read_from_buffer\n");
+    // see if you can find a way to extract/remove from buffer w/out printing
+    c = circular_buffer_read(cb);
+    while(true) {
+        if(c == 'i') {
+            break;
+        }
+        printf("hi the current c is %c\n", c);
+        c = circular_buffer_read(cb);
+    }
+    printf("exiting readbuffer_writeoutput\n");
     pthread_exit(NULL);
 }
 
