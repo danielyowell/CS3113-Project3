@@ -98,10 +98,6 @@ void* readfile_writebuffer(void* arg) {
 
     // while the end of the file has not been reached
     while ((c = fgetc(fp)) != EOF) {
-        if (c == '*') {
-            printf("asterisk found\n");
-            break;
-        }
         // "write" should return 0
         // if it returns -1, the buffer is full
         int write = circular_buffer_write(cb, c);
@@ -114,6 +110,9 @@ void* readfile_writebuffer(void* arg) {
         usleep(100000);
     }
 
+    // write closing character '*' to buffer
+    circular_buffer_write(cb, '*');
+    
     // close file
     fclose(fp);
     printf("readfile_writebuffer: exiting\n");
@@ -137,8 +136,10 @@ void* readbuffer_writeoutput(void* arg) {
     // see if you can find a way to extract/remove from buffer w/out printing
     c = circular_buffer_read(cb);
     while(true) {
-        if(c == 'i') {
-            break;
+        if(c == '*') {
+            // let's try this
+            printf("exiting readbuffer_writeoutput\n");
+            pthread_exit(NULL);
         }
         printf("hi the current c is %c\n", c);
         c = circular_buffer_read(cb);
