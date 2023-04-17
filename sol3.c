@@ -49,7 +49,7 @@ char circular_buffer_read(circular_buffer *cb) {
         }
         // Otherwise, extract character from head of buffer and print
         char c = cb->buffer[cb->head];
-        printf("%c\n",c);
+        printf("%c",c);
         // update head index
         cb->head = (cb->head + 1) % BUFFER_SIZE;
     // END CRITICAL SECTION
@@ -105,12 +105,12 @@ void *write_to_buffer(void *arg) {
             printf("buffer is full right now\n");
         }
         else {
-            printf("buffer has space\n");
+            //printf("buffer has space\n");
         }
         //printf("lol\n");
-        sleep(1);
+        sleep(.5);
     }
-    printf("closing write_to_buffer\n");
+    printf("\nclosing write_to_buffer\n");
     fclose(fp);
     return NULL;
 }
@@ -121,9 +121,7 @@ void *read_from_buffer(void *arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     while ((c = circular_buffer_read(cb)) != '*') {
-        //putchar(c);
-        //printf("%c",c);
-        sleep(1);
+        sleep(.5);
     }
     return NULL;
 }
@@ -158,8 +156,8 @@ int main() {
     circular_buffer_read(&cb);
     circular_buffer_read(&cb);    
     */
-
     pthread_join(write_thread, NULL);
     pthread_join(read_thread, NULL);
+    printf("threads have been joined\n");
     return 0;
 }
