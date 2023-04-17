@@ -46,12 +46,18 @@ int circular_buffer_full(circular_buffer *cb) {
 
 char circular_buffer_read(circular_buffer *cb) {
     char value;
+    // mutex_lock: safety with semaphores!
     pthread_mutex_lock(&cb->lock);
+    // if the buffer is empty
     if (circular_buffer_empty(cb)) {
         value = '\0';
     } else {
+        /*
         value = cb->buffer[cb->index_read];
         cb->index_read = (cb->index_read + 1) % BUFFER_SIZE;
+        cb->count--;
+        */
+        value = 
         cb->count--;
     }
     pthread_mutex_unlock(&cb->lock);
@@ -94,26 +100,50 @@ void *read_from_buffer(void *arg) {
     }
 }
 
+// READS FROM mytest.dat
+void *read_from_file(int x) {
+    circular_buffer *cb = (circular_buffer *)arg;
+    FILE *file = fopen("mytest.dat", "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file\n");
+        return NULL;
+    }
+    char c = fgetc(file);
+    while (c != EOF && c != '*') {
+        if (circular_buffer_write(cb, c) == 0) {
+            printf("Wrote %c to buffer\n", c);
+        }
+        c = fgetc(file);
+        sleep(1);
+    }
+    fclose(file);
+    return NULL;
+}
+
 int main() {
     circular_buffer cb;
     circular_buffer_init(&cb);
+    //cb = shm_open("/myshm", O_CREAT | O_RDWR, 0666);
 
     // Create thread for writing to circular buffer
+    /*
     pthread_t write_thread;
     if (pthread_create(&write_thread, NULL, write_to_buffer, (void *)&cb)) {
         fprintf(stderr, "Error creating write thread\n");
         return -1;
     }
+    */
+
 
     // Create thread for reading from circular buffer
     pthread_t read_thread;
-    if (pthread_create(&read_thread, NULL, read_from_buffer, (void *)&cb)) {
+    if (pthread_create(&read_thread, NULL, read_from_file(10), (void *)&cb)) {
         fprintf(stderr, "Error creating read thread\n");
         return -1;
     }
 
     // Wait for threads to complete
-    pthread_join(write_thread, NULL);
+    //pthread_join(write_thread, NULL);
     pthread_join(read_thread, NULL);
 
     circular_buffer_destroy(&cb);
