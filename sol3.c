@@ -108,9 +108,9 @@ void *write_to_buffer(void *arg) {
             //printf("buffer has space\n");
         }
         //printf("lol\n");
-        sleep(.5);
+        sleep(1);
     }
-    printf("\nclosing write_to_buffer\n");
+    printf("\nexiting write_to_buffer\n");
     fclose(fp);
     return NULL;
 }
@@ -118,11 +118,17 @@ void *write_to_buffer(void *arg) {
 // READ FROM BUFFER, WRITE TO OUTPUT
 // after writing to output, remove from buffer
 void *read_from_buffer(void *arg) {
+    printf("beginning read_from_buffer\n");
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     while ((c = circular_buffer_read(cb)) != '*') {
-        sleep(.5);
+        sleep(1);
+        if(c == EOF) {
+            break;
+        }
+        //printf("current c: %c\n",c); // why does this allow for printing?!?!
     }
+    printf("\nexiting read_from_buffer\n");
     return NULL;
 }
 
@@ -135,11 +141,13 @@ int main() {
     circular_buffer cb;
     circular_buffer_init(&cb);
 
+    // CREATE CONSUMER: reads from buffer, writes to output
+    pthread_create(&read_thread, NULL, read_from_buffer, &cb);
+    sleep(1);
     // CREATE PRODUCER: reads from file, writes to buffer
     // we pass &cb as an argument to write_to_buffer. does this mean it gets used by the thread?
     pthread_create(&write_thread, NULL, write_to_buffer, &cb);
-    // CREATE CONSUMER: reads from buffer, writes to output
-    pthread_create(&read_thread, NULL, read_from_buffer, &cb);
+
     
     /*
     circular_buffer_write(&cb, 'a');
