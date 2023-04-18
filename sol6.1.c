@@ -37,7 +37,6 @@ void circular_buffer_init(circular_buffer *cb) {
 }
 
 //? HELPER METHODS
-
 bool circular_buffer_has_space(circular_buffer *cb) {
     bool result;
     pthread_mutex_lock(&cb->mutex);
@@ -116,7 +115,9 @@ void* readfile_writebuffer(void* arg) {
         bool x = circular_buffer_has_space(cb);
         if(x == true) {
             c = fgetc(fp);
-            circular_buffer_write(cb, c);
+            if(c != EOF) {
+                circular_buffer_write(cb, c);
+            }
         }
     }
     // wait until there is space for one more character
@@ -145,7 +146,6 @@ void* readbuffer_writeoutput(void* arg) {
         printf("%c", c);
         fflush(stdout);
     }
-    printf("exiting consumer\n");
     pthread_exit(NULL);
 }
 
