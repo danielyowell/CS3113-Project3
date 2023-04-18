@@ -40,7 +40,19 @@ void circular_buffer_init(circular_buffer *cb) {
 
 // write to buffer (do NOT print)
 int circular_buffer_write(circular_buffer *cb, char c) {
-
+    sem_wait(&cb->full);
+    pthread_mutex_lock(&cb->mutex);
+    int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+    if (next_tail == cb->head) {
+        pthread_mutex_unlock(&cb->mutex);
+        sem_post(&cb->full);
+        return -1; // Buffer is full
+    }
+    cb->buffer[cb->tail] = c;
+    cb->tail = next_tail;
+    pthread_mutex_unlock(&cb->mutex);
+    sem_post(&cb->empty);
+    return 0;
 }
 
 // extract character from buffer, move up head of buffer
