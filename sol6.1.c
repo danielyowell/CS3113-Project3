@@ -87,7 +87,7 @@ void* readfile_writebuffer(void* arg) {
         bool x = true;
         if(x == true) {
             c = fgetc(fp);
-            circular_buffer_write(&cb, c);
+            circular_buffer_write(cb, c);
         }
     }
 
