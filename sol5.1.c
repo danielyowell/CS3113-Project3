@@ -99,12 +99,9 @@ void* readfile_writebuffer(void* arg) {
     while ((c = fgetc(fp)) != EOF) {
         // "write" should return 0
         // if it returns -1, the buffer is full
-        int write = circular_buffer_write(cb, c);
-        if (write != 0) {
-            printf("buffer is full right now\n");
-        }
-        else {
-            //printf("wrote %c to buffer\n", c);
+        int write = -1;
+        while(write != 0) {
+            circular_buffer_write(cb, c);
         }
         usleep(100000);
     }
@@ -133,6 +130,10 @@ void* readbuffer_writeoutput(void* arg) {
         //sleep(1);
     }
     pthread_exit(NULL);
+}
+
+void* dummy(void* arg) {
+    printf("lol\n");
 }
 
 // MAIN FUNCTION

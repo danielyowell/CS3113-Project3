@@ -22,16 +22,18 @@ typedef struct {
     char buffer[BUFFER_SIZE];
     int head;
     int tail;
-    pthread_mutex_t mutex;
+    sem_t lock;
     sem_t full;
     sem_t empty;
 } circular_buffer;
+
+char CLOSINGCHAR = '*';
 
 // INITIALIZE CIRCULAR BUFFER
 void circular_buffer_init(circular_buffer *cb) {
     cb->head = 0;
     cb->tail = 0;
-    pthread_mutex_init(&cb->mutex, NULL);
+    sem_init(&cb->lock, 0, 1);
     sem_init(&cb->full, 0, BUFFER_SIZE);
     sem_init(&cb->empty, 0, 0);
 }
@@ -39,26 +41,35 @@ void circular_buffer_init(circular_buffer *cb) {
 //? HELPER METHODS
 bool circular_buffer_has_space(circular_buffer *cb) {
     bool result;
-    pthread_mutex_lock(&cb->mutex);
-    int next_tail = (cb->tail + 1) % BUFFER_SIZE;
-    result = (next_tail != cb->head);
-    pthread_mutex_unlock(&cb->mutex);
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+        result = (next_tail != cb->head);
+    // release lock
+    sem_post(&cb->lock);
     return result;
 }
 
 // write to buffer (do NOT print)
 int circular_buffer_write(circular_buffer *cb, char c) {
     sem_wait(&cb->full);
-    pthread_mutex_lock(&cb->mutex);
-    int next_tail = (cb->tail + 1) % BUFFER_SIZE;
-    if (next_tail == cb->head) {
-        pthread_mutex_unlock(&cb->mutex);
-        sem_post(&cb->full);
-        return -1; // Buffer is full
-    }
-    cb->buffer[cb->tail] = c;
-    cb->tail = next_tail;
-    pthread_mutex_unlock(&cb->mutex);
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+        if (next_tail == cb->head) {
+            // release lock
+            sem_post(&cb->lock);
+
+            sem_post(&cb->full);
+            return -1; // Buffer is full
+        }
+        cb->buffer[cb->tail] = c;
+        cb->tail = next_tail;
+    // release lock
+    sem_post(&cb->lock);
+
     sem_post(&cb->empty);
     return 0;
 }
@@ -67,12 +78,14 @@ int circular_buffer_write(circular_buffer *cb, char c) {
 char circular_buffer_read(circular_buffer *cb) {
     // wait on the "empty" semaphore to ensure that there is at least one slot occupied in the buffer
     sem_wait(&cb->empty);
-    // acquire mutex
-    pthread_mutex_lock(&cb->mutex);
-    // CRITICAL SECTION
-        // Buffer is empty
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        // If buffer is empty
         if (cb->head == cb->tail) {
-            pthread_mutex_unlock(&cb->mutex);
+            // release lock
+            sem_post(&cb->lock);
+
             sem_post(&cb->empty);
             return '\0'; 
         }
@@ -80,15 +93,14 @@ char circular_buffer_read(circular_buffer *cb) {
         char c = cb->buffer[cb->head];
         // update head index
         cb->head = (cb->head + 1) % BUFFER_SIZE;
-    // END CRITICAL SECTION
-    // release mutex
-    pthread_mutex_unlock(&cb->mutex);
+    // release lock
+    sem_post(&cb->lock);
     // signal the "full" semaphore to indicate that there is one more slot available in the buffer
     sem_post(&cb->full);
     return c;
 }
 
-//! BIG BOYS
+//! MAIN THREAD FUNCTIONS
 
 /*
 THREAD 1: PRODUCER
@@ -124,13 +136,12 @@ void* readfile_writebuffer(void* arg) {
     while(circular_buffer_has_space(cb) == false) {
 
     }
-    // write closing character '*' to buffer
-    circular_buffer_write(cb, '*');
+    // write closing character to buffer
+    circular_buffer_write(cb, CLOSINGCHAR);
     
     // close file
     fclose(fp);
     pthread_exit(NULL);
-    // printf("exiting producer\n");
 }
 
 // CONSUMER
@@ -138,9 +149,9 @@ void* readbuffer_writeoutput(void* arg) {
     circular_buffer *cb = (circular_buffer *) arg;
     char c;
     while(true) {
-        usleep(50000); // sleep(1);
+        sleep(1);
         c = circular_buffer_read(cb);
-        if(c == '*') {
+        if(c == CLOSINGCHAR) {
             pthread_exit(NULL);
         }
         printf("%c", c);
@@ -151,18 +162,15 @@ void* readbuffer_writeoutput(void* arg) {
 
 // MAIN FUNCTION
 int main() {
-    // Create pthread objects
+    // create pthread objects
     pthread_t write_thread, read_thread;
     
-    // Initialize circular buffer
+    // initialize circular buffer
     circular_buffer cb;
     circular_buffer_init(&cb);
 
     // CREATE PRODUCER: reads from file, writes to buffer
     pthread_create(&write_thread, NULL, readfile_writebuffer, &cb);
-
-    // Sleep for 0.5 seconds
-    usleep(100000);
     
     // CREATE CONSUMER: reads from buffer, writes to output
     pthread_create(&read_thread, NULL, readbuffer_writeoutput, &cb);
@@ -175,13 +183,18 @@ int main() {
     // release memory
 
     // destroy semaphores
-    int x = sem_destroy(&cb.full); // Destroy semaphore
+    int x = sem_destroy(&cb.full); 
     if (x != 0) {
         perror("could not destroy semaphore");
         return 1;
     }
-    int y = sem_destroy(&cb.full); // Destroy semaphore
+    int y = sem_destroy(&cb.full); 
     if (y != 0) {
+        perror("could not destroy semaphore");
+        return 1;
+    }
+    int z = sem_destroy(&cb.lock); 
+    if (z != 0) {
         perror("could not destroy semaphore");
         return 1;
     }

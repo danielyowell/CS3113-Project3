@@ -50,7 +50,7 @@ char circular_buffer_read(circular_buffer *cb) {
         }
         // Otherwise, extract character from head of buffer and print
         char c = cb->buffer[cb->head];
-        printf("%c",c); // no
+        //printf("%c",c); // no
         // update head index
         cb->head = (cb->head + 1) % BUFFER_SIZE;
     // END CRITICAL SECTION
@@ -78,7 +78,7 @@ int circular_buffer_write(circular_buffer *cb, char c) {
     return 0;
 }
 
-// READ FROM FILE, WRITE TO BUFFER
+// !! READ FROM FILE, WRITE TO BUFFER
 void *write_to_buffer(void *arg) {
     printf("beginning write_to_buffer\n");
     // this should be the same circular buffer as before (arg)
@@ -101,7 +101,9 @@ void *write_to_buffer(void *arg) {
         // "write" should return 0
         // if it returns -1, the buffer is full
         int write = circular_buffer_write(cb, c);
-        printf("write_to_buffer: wrote %c to buffer\n", c);
+        //printf("write_to_buffer: wrote %c to buffer\n", c);
+        //printf("%c\n", c);
+        printf("@\n");
         if (write != 0) {
             //fprintf(stderr, "Circular buffer is full\n");
             //break;

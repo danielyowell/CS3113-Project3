@@ -11,6 +11,12 @@
 #include <fcntl.h>
 #include <sys/sem.h>
 #include <sys/ipc.h>
+// THREAD TIME
+#include <pthread.h>
+// SHARED MEMORY
+#define SHM_SIZE 1024  // Size of shared memory object
+
+
 
 // Define a struct for the circular buffer with the following fields:
 // - An array to store the data
@@ -71,9 +77,32 @@ void circular_buffer_free(CircularBuffer* cb) {
     free(cb->buffer);
 }
 
+/*
+THREAD BEHAVIORS
+*/
+void* readfile_writebuffer(void* arg) {
+    // Do some task in thread 1
+    printf("Thread 1\n");
+    pthread_exit(NULL);
+}
+
+void* readbuffer_writeoutput(void* arg) {
+    // Do some task in thread 2
+    printf("Thread 2\n");
+    pthread_exit(NULL);
+}
+
 int main(void) {
     printf("hello world\n");
     CircularBuffer cb;
+
+    // int shm_fd;  // File descriptor for shared memory object
+    char *shm_ptr;  // Pointer to shared memory object
+
+    // Create a new shared memory object with read/write permissions
+    cb = shm_open("/myshm", O_CREAT | O_RDWR, 0666);
+
+
     circular_buffer_init(&cb, 5);
     circular_buffer_write(&cb, 'a');
     circular_buffer_write(&cb, 'b');
@@ -97,4 +126,26 @@ int main(void) {
     circular_buffer_read(&cb, &item); // error: buffer empty
     circular_buffer_free(&cb);
     printf("successful circular buffer\n");
+
+    pthread_t thread1, thread2;
+    int ret1, ret2;
+
+    // Create thread 1
+    ret1 = pthread_create(&thread1, NULL, readfile_writebuffer, NULL);
+    if (ret1 != 0) {
+        printf("Error creating thread 1\n");
+        return -1;
+    }
+
+    // Create thread 2
+    ret2 = pthread_create(&thread2, NULL, readbuffer_writeoutput, NULL);
+    if (ret2 != 0) {
+        printf("Error creating thread 2\n");
+        return -1;
+    }
+
+    // Wait for the threads to finish
+    pthread_join(thread1, NULL);
+    pthread_join(thread2, NULL);
+
 }
