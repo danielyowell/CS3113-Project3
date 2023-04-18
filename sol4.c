@@ -105,7 +105,7 @@ void* readfile_writebuffer(void* arg) {
             printf("buffer is full right now\n");
         }
         else {
-            printf("wrote %c to buffer\n", c);
+            //printf("wrote %c to buffer\n", c);
         }
         usleep(100000);
     }
@@ -138,12 +138,14 @@ void* readbuffer_writeoutput(void* arg) {
     while(true) {
         if(c == '*') {
             // let's try this
-            printf("exiting readbuffer_writeoutput\n");
+            printf("\nexiting readbuffer_writeoutput\n");
             pthread_exit(NULL);
         }
-        printf("hi the current c is %c\n", c);
+        printf("%c", c);
+        fflush(stdout);
         c = circular_buffer_read(cb);
     }
+    printf("\n");
     printf("exiting readbuffer_writeoutput\n");
     pthread_exit(NULL);
 }
