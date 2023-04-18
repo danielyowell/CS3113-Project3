@@ -1,5 +1,7 @@
+// @author Daniel Yowell
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -11,191 +13,191 @@
 #include <fcntl.h>
 #include <sys/sem.h>
 #include <sys/ipc.h>
+#include <pthread.h>
+#include <semaphore.h>
 
-// * SHARED MEMORY
+// STRUCT
+#define BUFFER_SIZE 15
+typedef struct {
+    char buffer[BUFFER_SIZE];
+    int head;
+    int tail;
+    sem_t lock;
+    sem_t full;
+    sem_t empty;
+} circular_buffer;
 
-/* key number */
-#define SHMKEY ((key_t) 1497)
-/* defines struct shared_mem with int variable "value" */
-typedef struct
-{
-    int value;
-} shared_mem;
-/* create shared memory (pointer) */
-shared_mem *total;
+char CLOSINGCHAR = '*';
 
-// * SEMAPHORES
-
-/* semaphore key */
-#define SEMKEY ((key_t) 400L)
-
-/* number of semaphores being created */
-#define NSEMS 1
-
-/* GLOBAL */
-int semaphore_id; /* semaphore id */
-
-/* semaphore buffers */
-static struct sembuf OP = {0,-1,SEM_UNDO};
-static struct sembuf OV = {0,1,SEM_UNDO};
-
-/* union to store semaphore value (I think struct also works) */
-typedef union {
-  int val;
-  struct semid_ds *buf;
-  ushort *array;
-} semunion;
-
-/* function for semaphore to protect critical section */
-int POP(){
-return semop(semaphore_id, &OP,1);
+// INITIALIZE CIRCULAR BUFFER
+void circular_buffer_init(circular_buffer *cb) {
+    cb->head = 0;
+    cb->tail = 0;
+    sem_init(&cb->lock, 0, 1);
+    sem_init(&cb->full, 0, BUFFER_SIZE);
+    sem_init(&cb->empty, 0, 0);
 }
 
-/* function for semaphore to release protection */
-int VOP(){
-return semop(semaphore_id, &OV,1);
+//? HELPER METHODS
+bool circular_buffer_has_space(circular_buffer *cb) {
+    bool result;
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+        result = (next_tail != cb->head);
+    // release lock
+    sem_post(&cb->lock);
+    return result;
 }
 
-// * PROCESSES
-void process1() {
-    for(int x = 0; x < 100000; x++) {
-        total->value = total->value + 1;
-    }
-    return;
-}
-void process2() {
-    for(int x = 0; x < 200000; x++) {
-        total->value = total->value + 1;
-    }
-    return;
-}
-void process3() {
-    for(int x = 0; x < 300000; x++) {
-        total->value = total->value + 1;
-    }
-    return;
-}
-void process4() {
-    for(int x = 0; x < 500000; x++) {
-        total->value = total->value + 1;
-    }
-    return;
-}
+// write to buffer (do NOT print)
+int circular_buffer_write(circular_buffer *cb, char c) {
+    sem_wait(&cb->full);
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+        if (next_tail == cb->head) {
+            // release lock
+            sem_post(&cb->lock);
 
-int main(void) {
-  
-  // * SHARED MEMORY INITIALIZATION
-  int shmid = shmget (SHMKEY, sizeof(int), IPC_CREAT | 0666);
-  /* main function address */
-    char *shmadd;
-    shmadd = (char *) 0;
-    
-    total = (shared_mem*) shmat (shmid, shmadd, 0);
-    
-    total->value = 0;
-
-  // * SEMAPHORE INITIALIZATION
-  int status;
-  pid_t pid;
-  int cpid;
-  struct sembuf semaphore;
-  // Create a semaphore with an initial value of 1.
-  semaphore_id = semget(IPC_PRIVATE, 1, 0666 | IPC_CREAT);
-  if (semaphore_id < 0) {
-    perror("Could not create semaphore");
-    exit(1);
-  }
-  semunion su;
-  su.val = 1;
-  status = semctl(semaphore_id, 0, SETVAL, su);
-  if (status < 0) {
-    perror("Could not set semaphore value");
-    exit(1);
-  }
-
-  pid = fork();
-    // CHILD 1
-    if(pid == 0) { 
-        // WAITING
-        POP();
-        // CRITICAL
-        process1(); 
-        printf("From Process 1: counter = %d.\n", total->value);
-        // EXITING
-        VOP();
-        exit(0);
-    }
-    // PARENT
-    if(pid != 0) {
-        pid = fork();
-        // CHILD 2
-        if(pid == 0) { 
-            // WAITING
-            POP();
-            // CRITICAL
-            process2(); 
-            printf("From Process 2: counter = %d.\n", total->value);
-            // EXITING
-            VOP();
-            exit(0); 
+            sem_post(&cb->full);
+            return -1; // Buffer is full
         }
-        // PARENT
-        if(pid != 0) {
-            pid = fork();
-            // CHILD 3
-            if(pid == 0) { 
-                // WAITING
-                POP();
-                // CRITICAL
-                process3(); 
-                printf("From Process 3: counter = %d.\n", total->value);
-                // EXITING
-                VOP();
-                exit(0);
-            }
-            // PARENT
-            if(pid != 0) {
-                pid = fork();
-                // CHILD 4
-                if(pid == 0) { 
-                    // WAITING
-                    POP();
-                    // CRITICAL
-                    process4(); 
-                    printf("From Process 4: counter = %d.\n", total->value);
-                    // EXITING
-                    VOP();
-                    exit(0);
-                }
-                // PARENT
-                if(pid != 0) {
-                    cpid = wait(NULL);
-                    printf("Child with ID: %d has just exited.\n", cpid);
-                    cpid = wait(NULL);
-                    printf("Child with ID: %d has just exited.\n", cpid);
-                    cpid = wait(NULL);
-                    printf("Child with ID: %d has just exited.\n", cpid);
-                    cpid = wait(NULL);
-                    printf("Child with ID: %d has just exited.\n", cpid);
-                    // detach shared memory
-                    if (shmdt(total) == -1) {
-                        perror ("shmdt error (could not detach shared memory)");
-                        exit (-1);
-                    }   
-                    // delete shared memory
-                    shmctl(shmid, IPC_RMID, NULL); 
+        cb->buffer[cb->tail] = c;
+        cb->tail = next_tail;
+    // release lock
+    sem_post(&cb->lock);
 
-                    // Remove the semaphore.
-                    status = semctl(semaphore_id, 0, IPC_RMID);
-                    if (status == -1) {
-                        perror("semctl error (could not remove semaphore)");
-                        exit(1);
-                    }
+    sem_post(&cb->empty);
+    return 0;
+}
 
-                    printf("\nEnd of simulation.\n");
-                }                    
+// extract character from buffer, move up head of buffer
+char circular_buffer_read(circular_buffer *cb) {
+    // wait on the "empty" semaphore to ensure that there is at least one slot occupied in the buffer
+    sem_wait(&cb->empty);
+    // acquire lock
+    sem_wait(&cb->lock);
+        // CRITICAL SECTION
+        // If buffer is empty
+        if (cb->head == cb->tail) {
+            // release lock
+            sem_post(&cb->lock);
+
+            sem_post(&cb->empty);
+            return '\0'; 
+        }
+        // Otherwise, extract character from head of buffer and print
+        char c = cb->buffer[cb->head];
+        // update head index
+        cb->head = (cb->head + 1) % BUFFER_SIZE;
+    // release lock
+    sem_post(&cb->lock);
+    // signal the "full" semaphore to indicate that there is one more slot available in the buffer
+    sem_post(&cb->full);
+    return c;
+}
+
+//! MAIN THREAD FUNCTIONS
+
+/*
+THREAD 1: PRODUCER
+
+While the file is not empty, check if there is space in the buffer.
+    If there is space, read a character from the file and add it to the buffer.
+*/
+void* readfile_writebuffer(void* arg) {
+    // set up circular buffer
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c = 'x';
+
+    // open file
+    FILE *fp;
+    fp = fopen("mytest.dat", "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    // while the end of the file has not been reached
+    while (c != EOF) {
+        // check for space in buffer
+        bool x = circular_buffer_has_space(cb);
+        if(x == true) {
+            c = fgetc(fp);
+            if(c != EOF) {
+                circular_buffer_write(cb, c);
             }
         }
     }
-      return 0;
-  }
+    // wait until there is space for one more character
+    while(circular_buffer_has_space(cb) == false) {
+
+    }
+    // write closing character to buffer
+    circular_buffer_write(cb, CLOSINGCHAR);
+    
+    // close file
+    fclose(fp);
+    pthread_exit(NULL);
+}
+
+// CONSUMER
+void* readbuffer_writeoutput(void* arg) {
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c;
+    while(true) {
+        sleep(1);
+        c = circular_buffer_read(cb);
+        if(c == CLOSINGCHAR) {
+            pthread_exit(NULL);
+        }
+        printf("%c", c);
+        fflush(stdout);
+    }
+    pthread_exit(NULL);
+}
+
+// MAIN FUNCTION
+int main() {
+    // create pthread objects
+    pthread_t write_thread, read_thread;
+    
+    // initialize circular buffer
+    circular_buffer cb;
+    circular_buffer_init(&cb);
+
+    // CREATE PRODUCER: reads from file, writes to buffer
+    pthread_create(&write_thread, NULL, readfile_writebuffer, &cb);
+    
+    // CREATE CONSUMER: reads from buffer, writes to output
+    pthread_create(&read_thread, NULL, readbuffer_writeoutput, &cb);
+
+    pthread_join(write_thread, NULL);
+    pthread_join(read_thread, NULL);
+    // new line
+    printf("\n");
+
+    // release memory
+
+    // destroy semaphores
+    int x = sem_destroy(&cb.full); 
+    if (x != 0) {
+        perror("could not destroy semaphore");
+        return 1;
+    }
+    int y = sem_destroy(&cb.full); 
+    if (y != 0) {
+        perror("could not destroy semaphore");
+        return 1;
+    }
+    int z = sem_destroy(&cb.lock); 
+    if (z != 0) {
+        perror("could not destroy semaphore");
+        return 1;
+    }
+
+    return 0;
+}
