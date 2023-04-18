@@ -115,7 +115,7 @@ void* readfile_writebuffer(void* arg) {
     
     // close file
     fclose(fp);
-    printf("readfile_writebuffer: exiting\n");
+    printf("\nreadfile_writebuffer: exiting\n");
     pthread_exit(NULL);
 }
 void* readbuffer_writeoutput(void* arg) {
