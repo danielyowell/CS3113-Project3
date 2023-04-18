@@ -62,8 +62,36 @@ char circular_buffer_read(circular_buffer *cb) {
 
 //! BIG BOYS
 
-void* readfile_writebuffer(void* arg) {
+/*
+THREAD 1: PRODUCER
 
+While the file is not empty, check if there is space in the buffer.
+    If there is space, read a character from the file and add it to the buffer.
+*/
+void* readfile_writebuffer(void* arg) {
+    // set up circular buffer
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c = 'x';
+
+    // open file
+    FILE *fp;
+    fp = fopen("mytest.dat", "r");
+    if (fp == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+
+    // while the end of the file has not been reached
+    while (c != EOF) {
+        // check for space in buffer
+        bool x = true;
+        if(x == true) {
+            c = fgetc(fp);
+            circular_buffer_write(&cb, c);
+        }
+    }
+
+    printf("exiting producer\n");
 }
 
 // CONSUMER
