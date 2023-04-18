@@ -38,6 +38,15 @@ void circular_buffer_init(circular_buffer *cb) {
 
 //? HELPER METHODS
 
+bool circular_buffer_has_space(circular_buffer *cb) {
+    bool result;
+    pthread_mutex_lock(&cb->mutex);
+    int next_tail = (cb->tail + 1) % BUFFER_SIZE;
+    result = (next_tail != cb->head);
+    pthread_mutex_unlock(&cb->mutex);
+    return result;
+}
+
 // write to buffer (do NOT print)
 int circular_buffer_write(circular_buffer *cb, char c) {
     sem_wait(&cb->full);
@@ -57,7 +66,27 @@ int circular_buffer_write(circular_buffer *cb, char c) {
 
 // extract character from buffer, move up head of buffer
 char circular_buffer_read(circular_buffer *cb) {
-
+    // wait on the "empty" semaphore to ensure that there is at least one slot occupied in the buffer
+    sem_wait(&cb->empty);
+    // acquire mutex
+    pthread_mutex_lock(&cb->mutex);
+    // CRITICAL SECTION
+        // Buffer is empty
+        if (cb->head == cb->tail) {
+            pthread_mutex_unlock(&cb->mutex);
+            sem_post(&cb->empty);
+            return '\0'; 
+        }
+        // Otherwise, extract character from head of buffer and print
+        char c = cb->buffer[cb->head];
+        // update head index
+        cb->head = (cb->head + 1) % BUFFER_SIZE;
+    // END CRITICAL SECTION
+    // release mutex
+    pthread_mutex_unlock(&cb->mutex);
+    // signal the "full" semaphore to indicate that there is one more slot available in the buffer
+    sem_post(&cb->full);
+    return c;
 }
 
 //! BIG BOYS
@@ -84,19 +113,40 @@ void* readfile_writebuffer(void* arg) {
     // while the end of the file has not been reached
     while (c != EOF) {
         // check for space in buffer
-        bool x = true;
+        bool x = circular_buffer_has_space(cb);
         if(x == true) {
             c = fgetc(fp);
             circular_buffer_write(cb, c);
         }
     }
+    // wait until there is space for one more character
+    while(circular_buffer_has_space(cb) == false) {
 
-    printf("exiting producer\n");
+    }
+    // write closing character '*' to buffer
+    circular_buffer_write(cb, '*');
+    
+    // close file
+    fclose(fp);
+    pthread_exit(NULL);
+    // printf("exiting producer\n");
 }
 
 // CONSUMER
 void* readbuffer_writeoutput(void* arg) {
-
+    circular_buffer *cb = (circular_buffer *) arg;
+    char c;
+    while(true) {
+        usleep(50000); // sleep(1);
+        c = circular_buffer_read(cb);
+        if(c == '*') {
+            pthread_exit(NULL);
+        }
+        printf("%c", c);
+        fflush(stdout);
+    }
+    printf("exiting consumer\n");
+    pthread_exit(NULL);
 }
 
 // MAIN FUNCTION
@@ -119,6 +169,6 @@ int main() {
 
     pthread_join(write_thread, NULL);
     pthread_join(read_thread, NULL);
-    printf("\n");
+    printf("\njoined threads\n");
     return 0;
 }
